@@ -18,12 +18,6 @@
 
 ---
 
-<div align="center">
-
-![Rapid Builder Landing Page](./landingpage.jpg)
-
-</div>
-
 ## ✨ Overview
 
 **Rapid Builder** is an intelligent SaaS platform that automates your entire project setup and deployment workflow. Instead of spending hours configuring repositories, databases, authentication, and deployment pipelines, Rapid Builder handles all the infrastructure setup automatically. With one click, you get a fully configured GitHub repository, Supabase project with optimized database, Resend email audiences, and Vercel deployment—ready to code immediately.
