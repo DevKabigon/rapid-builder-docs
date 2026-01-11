@@ -18,6 +18,12 @@
 
 ---
 
+<div align="center">
+
+![Rapid Builder Landing Page](./landingpage.jpg)
+
+</div>
+
 ## ✨ Overview
 
 **Rapid Builder** is an intelligent SaaS platform that automates your entire project setup and deployment workflow. Instead of spending hours configuring repositories, databases, authentication, and deployment pipelines, Rapid Builder handles all the infrastructure setup automatically. With one click, you get a fully configured GitHub repository, Supabase project with optimized database, Resend email audiences, and Vercel deployment—ready to code immediately.
@@ -142,10 +148,11 @@ Rapid Builder orchestrates the entire project creation workflow automatically:
    - Configures `.env.example` with actual values
    - Pushes initial commit
 
-4. **Vercel Project Creation** (if enabled)
-   - Creates Vercel project linked to GitHub repo
+4. **Vercel Project Creation & Deployment** (if enabled)
+   - Creates Vercel project
    - Configures environment variables
-   - Optionally triggers initial deployment
+   - For one-click deploy: Links GitHub repository and triggers deployment
+   - For manual deploy: Waits for GitHub connection, then deploys when ready
 
 ### Step 3: Real-Time Monitoring
 
@@ -222,79 +229,6 @@ Rapid Builder orchestrates the entire project creation workflow automatically:
 
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+ installed
-- pnpm installed (`npm install -g pnpm`)
-- GitHub account
-- Supabase account (optional - can be created during setup)
-- Vercel account (optional - can be created during setup)
-
-### Installation
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/your-username/rapid-builder.git
-cd rapid-builder
-```
-
-2. **Install dependencies**
-
-```bash
-pnpm install
-```
-
-3. **Set up environment variables**
-
-Create a `.env.local` file in the root directory:
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# GitHub OAuth
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-GITHUB_OAUTH_CALLBACK_URL=http://localhost:3000/auth/callback
-
-# Vercel
-VERCEL_TOKEN=your_vercel_token
-
-# Encryption (generate a random 32-byte key)
-ENCRYPTION_KEY=your_32_byte_encryption_key
-
-# App URL
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-4. **Set up Supabase**
-
-Run the migrations to set up your database:
-
-```bash
-# Using Supabase CLI (recommended)
-supabase db push
-
-# Or manually run the SQL files in supabase/migrations/
-```
-
-5. **Run the development server**
-
-```bash
-pnpm dev
-```
-
-6. **Open your browser**
-
-Navigate to [http://localhost:3000](http://localhost:3000)
-
----
-
 ## 📁 Project Structure
 
 ```
@@ -304,11 +238,16 @@ rapid-builder/
 │   │   ├── auth/                # Authentication & OAuth callbacks
 │   │   ├── github/              # GitHub token management & verification
 │   │   ├── projects/            # Project creation & job management
-│   │   │   ├── create/         # Project initialization
+│   │   │   ├── create/         # Project initialization (legacy)
 │   │   │   ├── create-job/     # Job creation endpoint
 │   │   │   ├── start/          # Start async job processing
 │   │   │   └── [jobId]/        # Job-specific endpoints
-│   │   │       └── stream/     # SSE stream for real-time updates
+│   │   │       ├── stream/     # SSE stream for real-time updates
+│   │   │       ├── check-git-connection/  # Check GitHub connection status
+│   │   │       ├── continue-deployment/   # Continue deployment after Git connection
+│   │   │       ├── deploy/     # Manual deployment trigger
+│   │   │       ├── link-git/   # Link GitHub repository to Vercel
+│   │   │       └── update-deployment/     # Update deployment status
 │   │   ├── supabase/            # Supabase token & organization management
 │   │   ├── templates/           # Template fetching & management
 │   │   ├── vercel/              # Vercel token & deployment management
@@ -319,6 +258,23 @@ rapid-builder/
 │   ├── dashboard/               # Protected dashboard pages
 │   │   ├── create/             # Project creation wizard
 │   │   ├── jobs/               # Job listing & detail pages
+│   │   │   └── [jobId]/        # Job detail page with components
+│   │   │       └── components/ # Job-specific UI components
+│   │   │           ├── git-connection-waiting.tsx  # Git connection UI
+│   │   │           ├── job-action-buttons.tsx      # Action buttons
+│   │   │           ├── job-details-card.tsx        # Job details display
+│   │   │           ├── job-error-card.tsx          # Error display
+│   │   │           ├── job-header.tsx              # Job header
+│   │   │           ├── job-not-found.tsx           # Not found state
+│   │   │           ├── job-success-cta.tsx         # Success actions
+│   │   │           └── resources/                  # Resource cards
+│   │   │               ├── github-repo-card.tsx
+│   │   │               ├── resend-dashboard-card.tsx
+│   │   │               ├── resources-grid.tsx
+│   │   │               ├── supabase-project-card.tsx
+│   │   │               ├── vercel-deployment-card.tsx
+│   │   │               ├── vercel-error-card.tsx
+│   │   │               └── vercel-project-card.tsx
 │   │   ├── projects/           # Completed projects management
 │   │   ├── templates/          # Template browser
 │   │   └── settings/           # User settings & integrations
@@ -342,7 +298,8 @@ rapid-builder/
 │   │   ├── steps/              # Individual step implementations
 │   │   │   ├── github-step.ts  # GitHub repo creation
 │   │   │   ├── supabase-step.ts # Supabase project setup
-│   │   │   ├── vercel-step.ts  # Vercel deployment
+│   │   │   ├── vercel-step.ts  # Vercel project creation
+│   │   │   ├── vercel-deploy-step.ts  # Vercel deployment execution
 │   │   │   └── resend-step.ts  # Resend audience creation
 │   │   └── types.ts            # Type definitions
 │   ├── github/                 # GitHub API client
@@ -514,11 +471,18 @@ pnpm supabase:gen-types:local # Generate types from local Supabase instance
 
 Migrations are located in `supabase/migrations/`. The schema includes:
 
-- **project_jobs** - Tracks project creation jobs with status, progress, and results
+- **project_jobs** - Tracks project creation jobs with status, progress, completed steps, and step results (JSONB)
+- **job_logs** - Structured logging table for detailed job execution logs (used for real-time streaming)
 - **projects** - Stores completed project information
 - **templates** - Template metadata and configuration
 - **user_tokens** - Encrypted API tokens (GitHub, Vercel, Supabase, Resend)
 - **subscriptions** - User subscription management
+
+Key features:
+
+- **Idempotency** - Jobs track `completed_steps` array and `step_results` JSONB for safe retries
+- **Real-time Logging** - `job_logs` table stores structured logs with levels (info, warning, error)
+- **Step State Management** - Helper functions for checking and marking step completion
 
 To apply migrations:
 
@@ -588,14 +552,23 @@ Understanding how projects are created helps with debugging and extending:
 
    - Orchestrates all steps in sequence
    - Updates job status and progress
-   - Stores intermediate results
+   - Stores intermediate results in `step_results` JSONB field
+   - Tracks completed steps for idempotency
    - Handles errors and retries
+   - Supports continuation after Git connection (for Vercel one-click deploy)
 
 4. **Real-Time Updates** (`/api/projects/[jobId]/stream`)
+
    - SSE endpoint for live progress
    - Polls database every second
    - Sends updates to client
    - Closes when job completes/fails
+
+5. **Git Connection & Deployment Continuation** (optional, for Vercel)
+   - If one-click deploy is enabled, automatically continues deployment
+   - If manual, job status becomes `waiting_for_git_connection`
+   - User can manually link GitHub repo via `/api/projects/[jobId]/link-git`
+   - Deployment continues via `/api/projects/[jobId]/continue-deployment`
 
 ### Environment Setup Tips
 
@@ -800,8 +773,8 @@ You can also host documentation as a static website using:
 
 ## 📞 Support
 
-- 🐛 [Report a Bug](https://github.com/gyorutan/rapid-builder/issues)
-- 💡 [Request a Feature](https://github.com/gyorutan/rapid-builder/issues)
+- 🐛 [Report a Bug](https://github.com/DevKabigon/rapid-builder/issues)
+- 💡 [Request a Feature](https://github.com/DevKabigon/rapid-builder/issues)
 - 📧 Email: support@rapidbuilder.com
 
 ---
